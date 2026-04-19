@@ -35,7 +35,8 @@ function aiSmart(selfId) {
   // 找到最佳分数后，在"接近最佳"的动作里随机选一个（打破平局 + 增加变化）
   scored.sort((a, b) => b.score - a.score);
   const bestScore = scored[0].score;
-  const tol = Math.max(8, Math.abs(bestScore) * 0.05);
+  // 更紧的 tie-breaking：3 分或 2% 内才算同档
+  const tol = Math.max(3, Math.abs(bestScore) * 0.02);
   const near = scored.filter(s => bestScore - s.score <= tol);
   return near[Math.floor(Math.random() * near.length)].choice;
 }
@@ -76,14 +77,14 @@ function minimaxEval(simState, myChoice, selfId, depth, deadline) {
   }
 
   if (scores.length === 0) return evaluate(simState, selfId);
-  // Soft minimax: 不再假设对方总能完美反制（避免 stall 循环）
-  // 权重：worst 40% + 2nd 25% + 3rd 15% + 平均 20%
+  // Soft minimax: 更乐观（降低风险厌恶，让 AI 敢打）
+  // 权重：worst 30% + 2nd 20% + 3rd 15% + 平均 35%
   scores.sort((a, b) => a - b);
   const avg = scores.reduce((x, y) => x + y, 0) / scores.length;
-  return scores[0] * 0.40
-    + (scores[1] !== undefined ? scores[1] : scores[0]) * 0.25
+  return scores[0] * 0.30
+    + (scores[1] !== undefined ? scores[1] : scores[0]) * 0.20
     + (scores[2] !== undefined ? scores[2] : scores[0]) * 0.15
-    + avg * 0.20;
+    + avg * 0.35;
 }
 
 // 剪枝：根据快速启发式打分，保留前 N 个候选
@@ -118,9 +119,11 @@ function quickActionScore(simState, choice, pid) {
   if (a.absorbsAll && foe.energy >= 1) s += 5;
   if (a.damageFrom === 'throwCharges' && p.throwCharges > 0) s += p.throwCharges * 4;
   // 醉酒狂暴：耗可乐爆发伤害，可乐越多越值
-  if (a.dynamicCost === 'allCola' && p.cola > 0) s += p.cola * 6 + 3;
-  // 阿宅霰弹枪：稳定输出
-  if (a.id === 'shotgun' && p.hp > 1) s += 4;
+  if (a.dynamicCost === 'allCola' && p.cola >= 2) s += p.cola * 6 + 5;
+  // 阿宅霰弹枪：稳定输出，HP 足时主动出
+  if (a.id === 'shotgun' && p.hp >= 1.5) s += 8;
+  // 痛饮：能量多时转换为可乐（预备爆发）
+  if (a.dynamicCost === 'allEnergy' && p.energy >= 2) s += p.energy * 2;
   if (a.hpCost && p.hp <= a.hpCost + 0.5) s -= 10;  // 差点自杀
   // 免费券
   if (p.freeCharges && p.freeCharges[choice.action] > 0) s += 5;
@@ -308,13 +311,15 @@ function characterBonus(me, foe, sign) {
 
   // 刺客
   if (me.characterId === 'assassin') {
-    // 遁入暗影未用 = 保命符
-    if (!me.usedOnceSkills?.includes('shadowStep')) b += 18;
-    // 解锁了强力技能
-    if (me.unlockedSkills?.includes('puppet')) b += 12;
-    if (me.unlockedSkills?.includes('deadlyPoison')) b += 10;
-    // 可操纵对方 = 可借用对方资源
-    if (me.puppetTarget !== null) b += 50;
+    // 遁入暗影未用 = 保命符，但不要太高否则 AI 永远不用
+    if (!me.usedOnceSkills?.includes('shadowStep')) b += 8;
+    // 解锁了强力技能 —— 这些应该比保留未用更值钱
+    if (me.unlockedSkills?.includes('puppet')) b += 25;
+    if (me.unlockedSkills?.includes('deadlyPoison')) b += 22;
+    // 可操纵对方
+    if (me.puppetTarget !== null) b += 55;
+    // 有内力中毒在对方身上：鼓励叠加（中毒是永久效果）
+    if (foe.poisonStacks > 0) b += foe.poisonStacks * 8;
   }
 
   // 铁皮：已积对方激怒层 = 潜在击杀
