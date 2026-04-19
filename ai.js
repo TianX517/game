@@ -27,18 +27,17 @@ function aiSmart(selfId) {
   if (myChoices.length === 0) return aiHeuristic(selfId);
 
   const deadline = Date.now() + AI_TIMEOUT_MS;
-  let bestChoice = myChoices[0];
-  let bestScore = -Infinity;
-
-  // 顶层不剪枝（考虑所有我方动作），但内层剪枝
+  const scored = [];
   for (const myChoice of myChoices) {
     const score = minimaxEval(simState, myChoice, selfId, SEARCH_DEPTH, deadline);
-    if (score > bestScore) {
-      bestScore = score;
-      bestChoice = myChoice;
-    }
+    scored.push({ choice: myChoice, score });
   }
-  return bestChoice;
+  // 找到最佳分数后，在"接近最佳"的动作里随机选一个（打破平局 + 增加变化）
+  scored.sort((a, b) => b.score - a.score);
+  const bestScore = scored[0].score;
+  const tol = Math.max(8, Math.abs(bestScore) * 0.05);
+  const near = scored.filter(s => bestScore - s.score <= tol);
+  return near[Math.floor(Math.random() * near.length)].choice;
 }
 
 function minimaxEval(simState, myChoice, selfId, depth, deadline) {
@@ -77,14 +76,14 @@ function minimaxEval(simState, myChoice, selfId, depth, deadline) {
   }
 
   if (scores.length === 0) return evaluate(simState, selfId);
-  // Soft minimax: 不再假设对方总能完美反制，混合最差与平均
-  // 权重：worst 55% + 2nd worst 25% + 3rd worst 12% + 平均 8%
+  // Soft minimax: 不再假设对方总能完美反制（避免 stall 循环）
+  // 权重：worst 40% + 2nd 25% + 3rd 15% + 平均 20%
   scores.sort((a, b) => a - b);
   const avg = scores.reduce((x, y) => x + y, 0) / scores.length;
-  return scores[0] * 0.55
+  return scores[0] * 0.40
     + (scores[1] !== undefined ? scores[1] : scores[0]) * 0.25
-    + (scores[2] !== undefined ? scores[2] : scores[0]) * 0.12
-    + avg * 0.08;
+    + (scores[2] !== undefined ? scores[2] : scores[0]) * 0.15
+    + avg * 0.20;
 }
 
 // 剪枝：根据快速启发式打分，保留前 N 个候选
