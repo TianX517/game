@@ -1485,12 +1485,25 @@ function runBattle(char1Id, char2Id, opts = {}) {
       state.turn = sim.turn;
 
       let c0, c1;
-      if (sim.players[0].stunTurns > 0) c0 = { playerId: 0, action: 'recover', target: 0, stunned: true };
-      else c0 = aiFn(0);
-      if (sim.players[1].stunTurns > 0) c1 = { playerId: 1, action: 'recover', target: 1, stunned: true };
-      else c1 = aiFn(1);
+      try {
+        if (sim.players[0].stunTurns > 0) c0 = { playerId: 0, action: 'recover', target: 0, stunned: true };
+        else c0 = aiFn(0);
+        if (sim.players[1].stunTurns > 0) c1 = { playerId: 1, action: 'recover', target: 1, stunned: true };
+        else c1 = aiFn(1);
+      } catch (e) {
+        console.warn('AI error during benchmark turn:', e);
+        break;
+      }
+      // 防御：若 AI 返回无效动作，用 recover 兜底
+      if (!c0 || !ACTIONS[c0.action]) c0 = { playerId: 0, action: 'recover', target: 0 };
+      if (!c1 || !ACTIONS[c1.action]) c1 = { playerId: 1, action: 'recover', target: 1 };
 
-      resolveTurn([c0, c1], sim.players);
+      try {
+        resolveTurn([c0, c1], sim.players);
+      } catch (e) {
+        console.warn('resolveTurn error during benchmark:', e);
+        break;
+      }
       sim.turn += 1;
     }
   } finally {
@@ -1501,7 +1514,7 @@ function runBattle(char1Id, char2Id, opts = {}) {
   const p0 = sim.players[0], p1 = sim.players[1];
   if (p0.hp > p1.hp) return { winner: 0, turns: sim.turn, hpDiff: p0.hp - p1.hp };
   if (p1.hp > p0.hp) return { winner: 1, turns: sim.turn, hpDiff: p1.hp - p0.hp };
-  return { winner: -1, turns: sim.turn, hpDiff: 0 };  // 真正平局（HP 相等）
+  return { winner: -1, turns: sim.turn, hpDiff: 0 };
 }
 
 let benchState = null;
@@ -1530,10 +1543,9 @@ async function runTournament(nGames, aiMode, onProgress) {
         else if (r.winner === 1) losses++;
         else draws++;
         done++;
-        if (done % 5 === 0) {
-          onProgress({ done, total: totalMatches });
-          await new Promise(r => setTimeout(r, 0));
-        }
+        // 每场都让步，避免长时间阻塞 UI；每 20 场才重绘进度
+        if (done % 20 === 0) onProgress({ done, total: totalMatches });
+        await new Promise(r => setTimeout(r, 0));
       }
       matrix[c1][c2] = { wins, losses, draws, avgTurns: turnsAcc / nGames };
       totalsByChar[c1].wins += wins;

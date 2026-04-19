@@ -338,6 +338,12 @@ function aiHeuristic(selfId) {
   const available = playerAvailableActions(self);
   let pool = available.filter(id => canPayAction(self, id));
 
+  // 绝对 fallback：pool 为空时强制返回一个合法动作（几乎不可能，但防止崩溃）
+  if (pool.length === 0) {
+    if (self.baseActions.includes('recover')) return makeChoice(selfId, 'recover', selfId);
+    return makeChoice(selfId, self.baseActions[0], selfId);
+  }
+
   if (self.rageTurns > 0) {
     const skills = pool.filter(id => ACTIONS[id].kind === 'skill');
     if (skills.length) {
@@ -353,16 +359,18 @@ function aiHeuristic(selfId) {
     return makeChoice(selfId, 'recover', selfId);
   }
   if (foe.energy === 0) pool = pool.filter(id => ACTIONS[id].category !== 'defend');
+  if (pool.length === 0) return makeChoice(selfId, 'recover', selfId);  // 再保险
 
   const roll = Math.random();
   const attacks = pool.filter(id => ACTIONS[id].category === 'attack');
   const defs = pool.filter(id => ACTIONS[id].category === 'defend');
   const recs = pool.filter(id => ACTIONS[id].category === 'recover');
 
-  if (foe.hp === 1 && attacks.length && roll < 0.8) return makeChoice(selfId, pickAttackSmart(attacks, self), 1 - selfId);
-  if (self.hp === 1 && defs.length && roll < 0.6) return makeChoice(selfId, pickRand(defs), selfId);
-  if (attacks.length && roll < 0.5) return makeChoice(selfId, pickAttackSmart(attacks, self), 1 - selfId);
-  if (defs.length && roll < 0.75) return makeChoice(selfId, pickRand(defs), selfId);
+  // 更激进的攻击倾向（benchmark 下减少 stall）
+  if (foe.hp <= 1 && attacks.length && roll < 0.9) return makeChoice(selfId, pickAttackSmart(attacks, self), 1 - selfId);
+  if (self.hp <= 1 && defs.length && roll < 0.5) return makeChoice(selfId, pickRand(defs), selfId);
+  if (attacks.length && roll < 0.65) return makeChoice(selfId, pickAttackSmart(attacks, self), 1 - selfId);
+  if (defs.length && roll < 0.8) return makeChoice(selfId, pickRand(defs), selfId);
   if (recs.length) return makeChoice(selfId, pickRand(recs), selfId);
   return makeChoice(selfId, pickRand(pool), selfId);
 }
