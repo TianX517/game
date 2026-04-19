@@ -1,5 +1,12 @@
 CHANGELOG.push(
   {
+    version: 'v1.5',
+    date: '2026-04-19',
+    entries: [
+      { type: '新增', text: '主菜单加「角色平衡测试」入口：让 AI 两两对战，输出胜率矩阵 + 总排名 + 平衡建议。可选每搭配 5/10/20/50 局。' },
+    ],
+  },
+  {
     version: 'v1.4',
     date: '2026-04-19',
     entries: [

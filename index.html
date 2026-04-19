@@ -1074,6 +1074,7 @@ function render() {
   if (state.screen === 'setup') return renderSetup();
   if (state.screen === 'playing') return renderPlaying();
   if (state.screen === 'gameover') return renderGameOver();
+  if (state.screen === 'benchmark') return renderBenchmark();
 }
 
 function renderMenu() {
@@ -1092,6 +1093,7 @@ function renderMenu() {
       <p style="margin-bottom:16px; color:#aaa;">选择游戏模式</p>
       <button class="btn primary" id="btn-pvp">本地双人</button>
       <button class="btn primary" id="btn-pve">玩家 vs AI</button>
+      <button class="btn" id="btn-bench" style="font-size:13px;">角色平衡测试</button>
     </div>
     <div style="font-size:13px; color:#888; padding:14px; background:#0d1b2a; border-radius:6px; margin-top:10px;">
       <p><b>基础规则：</b></p>
@@ -1107,6 +1109,7 @@ function renderMenu() {
   `;
   document.getElementById('btn-pvp').onclick = () => { state.mode = 'pvp'; state.screen = 'setup'; render(); };
   document.getElementById('btn-pve').onclick = () => { state.mode = 'pve'; state.screen = 'setup'; render(); };
+  document.getElementById('btn-bench').onclick = () => { state.screen = 'benchmark'; render(); };
 }
 
 function tagClass(type) {
@@ -1459,6 +1462,228 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, ch => ({
     '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
   }[ch]));
+}
+
+// ============================================================
+// 角色平衡测试（headless 对战 + 锦标赛）
+// ============================================================
+
+function runBattle(char1Id, char2Id, turnLimit = 60) {
+  // 独立模拟：临时将全局 state 指向 sim，让 AI/resolveTurn 工作
+  const sim = {
+    turn: 1,
+    players: [makePlayer('A', char1Id), makePlayer('B', char2Id)],
+  };
+  const saved = { players: state.players, turn: state.turn };
+  state.players = sim.players;
+  state.turn = sim.turn;
+
+  try {
+    for (let t = 0; t < turnLimit; t++) {
+      if (sim.players[0].hp <= 0 || sim.players[1].hp <= 0) break;
+      state.turn = sim.turn;
+
+      let c0, c1;
+      if (sim.players[0].stunTurns > 0) c0 = { playerId: 0, action: 'recover', target: 0, stunned: true };
+      else c0 = aiChoose(0);
+      if (sim.players[1].stunTurns > 0) c1 = { playerId: 1, action: 'recover', target: 1, stunned: true };
+      else c1 = aiChoose(1);
+
+      resolveTurn([c0, c1], sim.players);
+      sim.turn += 1;
+    }
+  } finally {
+    state.players = saved.players;
+    state.turn = saved.turn;
+  }
+
+  const p0 = sim.players[0], p1 = sim.players[1];
+  if (p0.hp > 0 && p1.hp <= 0) return { winner: 0, turns: sim.turn };
+  if (p1.hp > 0 && p0.hp <= 0) return { winner: 1, turns: sim.turn };
+  return { winner: -1, turns: sim.turn };  // 平局 / 超时
+}
+
+let benchState = null;
+
+async function runTournament(nGames, onProgress) {
+  const chars = Object.keys(CHARACTERS);
+  const matrix = {};
+  const totalsByChar = {};
+  for (const c of chars) {
+    matrix[c] = {};
+    totalsByChar[c] = { wins: 0, losses: 0, draws: 0, turnsTotal: 0, games: 0 };
+  }
+
+  const totalMatches = chars.length * chars.length * nGames;
+  let done = 0;
+
+  for (const c1 of chars) {
+    for (const c2 of chars) {
+      let wins = 0, losses = 0, draws = 0, turnsAcc = 0;
+      for (let i = 0; i < nGames; i++) {
+        if (benchState && benchState.cancel) return null;
+        const r = runBattle(c1, c2);
+        turnsAcc += r.turns;
+        if (r.winner === 0) wins++;
+        else if (r.winner === 1) losses++;
+        else draws++;
+        done++;
+        if (done % 10 === 0) {
+          onProgress({ done, total: totalMatches });
+          await new Promise(r => setTimeout(r, 0));  // 让 UI 有机会重绘
+        }
+      }
+      matrix[c1][c2] = { wins, losses, draws, avgTurns: turnsAcc / nGames };
+      totalsByChar[c1].wins += wins;
+      totalsByChar[c1].losses += losses;
+      totalsByChar[c1].draws += draws;
+      totalsByChar[c1].turnsTotal += turnsAcc;
+      totalsByChar[c1].games += nGames;
+    }
+  }
+
+  return { matrix, totalsByChar };
+}
+
+function renderBenchmark() {
+  const chars = Object.keys(CHARACTERS);
+  app.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+      <button class="btn" id="bench-back" style="padding:6px 12px; font-size:13px;">返回</button>
+      <h1 style="margin:0;">角色平衡测试</h1>
+      <div style="width:80px;"></div>
+    </div>
+    <div style="background:#0d1b2a; padding:14px; border-radius:8px; margin-bottom:14px;">
+      <p style="color:#aaa; font-size:13px; margin-bottom:10px;">
+        让 AI 互相对战，统计胜率与均回合数。每个搭配跑 N 局，共 <b>${chars.length}×${chars.length}=${chars.length*chars.length}</b> 种搭配。
+      </p>
+      <label style="color:#aaa; font-size:13px;">每搭配局数：</label>
+      <select id="bench-n" style="padding:6px 10px; background:#0f3460; color:#fff; border:2px solid #533483; border-radius:6px;">
+        <option value="5">5（快，~1 分钟）</option>
+        <option value="10" selected>10（~2 分钟）</option>
+        <option value="20">20（~5 分钟）</option>
+        <option value="50">50（~15 分钟）</option>
+      </select>
+      <button class="btn primary" id="bench-start" style="margin-left:12px;">开始测试</button>
+      <button class="btn" id="bench-stop" style="margin-left:6px; display:none;">停止</button>
+    </div>
+    <div id="bench-progress" style="color:#f5a623; text-align:center; margin:16px 0; font-size:14px;"></div>
+    <div id="bench-result"></div>
+  `;
+  document.getElementById('bench-back').onclick = () => { if (benchState) benchState.cancel = true; state.screen = 'menu'; render(); };
+  document.getElementById('bench-start').onclick = startBenchmark;
+  document.getElementById('bench-stop').onclick = () => { if (benchState) benchState.cancel = true; };
+}
+
+async function startBenchmark() {
+  const n = parseInt(document.getElementById('bench-n').value, 10);
+  benchState = { cancel: false };
+  document.getElementById('bench-start').style.display = 'none';
+  document.getElementById('bench-stop').style.display = 'inline-block';
+  document.getElementById('bench-result').innerHTML = '';
+
+  const progEl = document.getElementById('bench-progress');
+  const t0 = Date.now();
+  const result = await runTournament(n, (p) => {
+    const pct = (p.done / p.total * 100).toFixed(1);
+    const elapsed = ((Date.now() - t0) / 1000).toFixed(0);
+    const eta = p.done > 0 ? (((Date.now() - t0) / p.done) * (p.total - p.done) / 1000).toFixed(0) : '?';
+    progEl.textContent = `进度 ${p.done} / ${p.total}（${pct}%，已用 ${elapsed}s，剩约 ${eta}s）`;
+  });
+
+  document.getElementById('bench-start').style.display = 'inline-block';
+  document.getElementById('bench-stop').style.display = 'none';
+  benchState = null;
+
+  if (!result) {
+    progEl.textContent = '已中止。';
+    return;
+  }
+  progEl.textContent = `完成！用时 ${((Date.now() - t0) / 1000).toFixed(1)}s`;
+  document.getElementById('bench-result').innerHTML = renderBenchResults(result, n);
+}
+
+function renderBenchResults(result, n) {
+  const chars = Object.keys(CHARACTERS);
+  const { matrix, totalsByChar } = result;
+
+  // 排序：按总体胜率降序
+  const ranking = chars.map(c => {
+    const t = totalsByChar[c];
+    const total = t.wins + t.losses + t.draws;
+    return { char: c, winRate: total ? t.wins / total : 0, ...t };
+  }).sort((a, b) => b.winRate - a.winRate);
+
+  const rankHtml = ranking.map((r, i) => {
+    const name = CHARACTERS[r.char].name;
+    const pct = (r.winRate * 100).toFixed(1);
+    const color = r.winRate > 0.6 ? '#ff4757' : r.winRate < 0.4 ? '#4cc9f0' : '#f5a623';
+    const tag = r.winRate > 0.6 ? '偏强' : r.winRate < 0.4 ? '偏弱' : '均衡';
+    return `<tr>
+      <td style="padding:6px;">${i + 1}</td>
+      <td style="padding:6px;">${escapeHtml(name)}</td>
+      <td style="padding:6px; color:${color}; font-weight:bold;">${pct}%</td>
+      <td style="padding:6px; color:#aaa; font-size:12px;">${r.wins}胜 ${r.losses}负 ${r.draws}平</td>
+      <td style="padding:6px; font-size:12px;">${tag}</td>
+    </tr>`;
+  }).join('');
+
+  // 矩阵：第一行是横轴角色（对手），第一列是纵轴角色（自己）
+  const matrixHeader = `<th style="padding:6px; background:#0d1b2a;"></th>` +
+    chars.map(c => `<th style="padding:6px; background:#0d1b2a; font-size:11px; color:#aaa;">vs ${escapeHtml(CHARACTERS[c].name)}</th>`).join('');
+
+  const matrixRows = chars.map(r => {
+    const rowCells = chars.map(c => {
+      const m = matrix[r][c];
+      const rate = m.wins / n;
+      const color = rate > 0.6 ? '#ff6b81' : rate < 0.4 ? '#7de5ff' : '#f5a623';
+      return `<td style="padding:6px; text-align:center; color:${color};">${(rate * 100).toFixed(0)}%</td>`;
+    }).join('');
+    return `<tr>
+      <th style="padding:6px; background:#0d1b2a; font-size:12px; text-align:right;">${escapeHtml(CHARACTERS[r].name)}</th>
+      ${rowCells}
+    </tr>`;
+  }).join('');
+
+  // 建议
+  const tips = [];
+  ranking.forEach(r => {
+    if (r.winRate > 0.62) tips.push(`· <b>${CHARACTERS[r.char].name}</b>（${(r.winRate*100).toFixed(0)}%）过强，考虑削弱（降伤、提费、加冷却）。`);
+    if (r.winRate < 0.38) tips.push(`· <b>${CHARACTERS[r.char].name}</b>（${(r.winRate*100).toFixed(0)}%）过弱，考虑加强（降费、加特效）。`);
+  });
+  // 找极端克制关系
+  for (const c1 of chars) {
+    for (const c2 of chars) {
+      if (c1 === c2) continue;
+      const rate = matrix[c1][c2].wins / n;
+      if (rate >= 0.85) tips.push(`· <b>${CHARACTERS[c1].name}</b> 克制 <b>${CHARACTERS[c2].name}</b>（${(rate*100).toFixed(0)}%），太极端。`);
+    }
+  }
+
+  return `
+    <h2 style="margin-bottom:8px;">总体排名</h2>
+    <table style="width:100%; border-collapse:collapse; background:#0f3460; border-radius:8px; overflow:hidden; margin-bottom:20px;">
+      <thead><tr style="background:#162850;">
+        <th style="padding:8px; color:#aaa; font-size:12px;">名次</th>
+        <th style="padding:8px; color:#aaa; font-size:12px; text-align:left;">角色</th>
+        <th style="padding:8px; color:#aaa; font-size:12px;">总胜率</th>
+        <th style="padding:8px; color:#aaa; font-size:12px;">战绩</th>
+        <th style="padding:8px; color:#aaa; font-size:12px;">评级</th>
+      </tr></thead>
+      <tbody>${rankHtml}</tbody>
+    </table>
+    <h2 style="margin-bottom:8px;">胜率矩阵（行=自己，列=对手，每格为 A 对 B 的胜率）</h2>
+    <div style="overflow-x:auto;">
+      <table style="border-collapse:collapse; background:#0f3460; border-radius:8px; font-size:13px;">
+        <thead><tr>${matrixHeader}</tr></thead>
+        <tbody>${matrixRows}</tbody>
+      </table>
+    </div>
+    ${tips.length ? `<h2 style="margin-top:20px; margin-bottom:8px;">建议</h2>
+    <div style="background:#0d1b2a; padding:14px; border-radius:8px; border-left:3px solid #f5a623; line-height:1.8; font-size:13px; color:#ccc;">
+      ${tips.join('<br>')}
+    </div>` : '<p style="color:#90ee90; margin-top:16px;">整体平衡良好，无极端偏差。</p>'}
+  `;
 }
 
 render();
