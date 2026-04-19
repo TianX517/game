@@ -51,7 +51,7 @@ function minimaxEval(simState, myChoice, selfId, depth, deadline) {
     return evaluate(next, selfId);
   }
 
-  let worstForMe = Infinity;
+  const scores = [];
   for (const foeChoice of foeChoices) {
     if (Date.now() > deadline) break;
     const next = applySimTurn(simState, [myChoice, foeChoice]);
@@ -73,9 +73,18 @@ function minimaxEval(simState, myChoice, selfId, depth, deadline) {
         leaf = bestNext !== -Infinity ? bestNext : evaluate(next, selfId);
       }
     }
-    if (leaf < worstForMe) worstForMe = leaf;
+    scores.push(leaf);
   }
-  return worstForMe;
+
+  if (scores.length === 0) return evaluate(simState, selfId);
+  // Soft minimax: 不再假设对方总能完美反制，混合最差与平均
+  // 权重：worst 55% + 2nd worst 25% + 3rd worst 12% + 平均 8%
+  scores.sort((a, b) => a - b);
+  const avg = scores.reduce((x, y) => x + y, 0) / scores.length;
+  return scores[0] * 0.55
+    + (scores[1] !== undefined ? scores[1] : scores[0]) * 0.25
+    + (scores[2] !== undefined ? scores[2] : scores[0]) * 0.12
+    + avg * 0.08;
 }
 
 // 剪枝：根据快速启发式打分，保留前 N 个候选
@@ -109,7 +118,10 @@ function quickActionScore(simState, choice, pid) {
   if (a.priority === 'highest') s += 6;
   if (a.absorbsAll && foe.energy >= 1) s += 5;
   if (a.damageFrom === 'throwCharges' && p.throwCharges > 0) s += p.throwCharges * 4;
-  if (a.dynamicCost === 'allCola' && p.cola > 0) s += p.cola * 3;
+  // 醉酒狂暴：耗可乐爆发伤害，可乐越多越值
+  if (a.dynamicCost === 'allCola' && p.cola > 0) s += p.cola * 6 + 3;
+  // 阿宅霰弹枪：稳定输出
+  if (a.id === 'shotgun' && p.hp > 1) s += 4;
   if (a.hpCost && p.hp <= a.hpCost + 0.5) s -= 10;  // 差点自杀
   // 免费券
   if (p.freeCharges && p.freeCharges[choice.action] > 0) s += 5;
@@ -280,6 +292,10 @@ function characterBonus(me, foe, sign) {
     if (me.hp === me.cola && me.hp > 0) b += 60;
     // 差 0.5 可达到（容易触发）
     if (Math.abs(me.hp - me.cola) === 0.5) b += 15;
+  }
+  // 阿宅：囤积太多可乐是浪费（可乐只能抵伤或转伤害，不花掉等于空转）
+  if (me.characterId === 'otaku' && me.cola > 3) {
+    b -= (me.cola - 3) * 6;  // 4→-6, 5→-12, 6→-18
   }
 
   // 法师「愤怒连击」：连击已起势（lastSkillUsed 可用）
