@@ -1,5 +1,13 @@
 CHANGELOG.push(
   {
+    version: 'v1.2',
+    date: '2026-04-19',
+    entries: [
+      { type: '调整', text: 'AI 全面升级为 paranoid minimax 搜索（1 回合前瞻）：模拟所有可能的回合组合，按最差情况选最优招。强度显著高于旧启发式。旧版保留作 fallback。' },
+      { type: '新增', text: '手机适配：viewport 元标签 + 响应式布局（角色卡垂直堆叠，按钮缩小）。' },
+    ],
+  },
+  {
     version: 'v1.1',
     date: '2026-04-19',
     entries: [
