@@ -1,0 +1,1441 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>对战游戏</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Microsoft YaHei", sans-serif;
+    background: #1a1a2e;
+    color: #eee;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+  }
+  #app {
+    width: 100%;
+    max-width: 920px;
+    background: #16213e;
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+  }
+  h1 { text-align: center; margin-bottom: 20px; color: #e94560; }
+  h2 { margin-bottom: 12px; color: #f5a623; }
+  .btn {
+    display: inline-block;
+    padding: 10px 18px;
+    margin: 6px;
+    background: #0f3460;
+    color: #fff;
+    border: 2px solid #533483;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 15px;
+    transition: all 0.15s;
+    font-family: inherit;
+  }
+  .btn:hover:not(:disabled) {
+    background: #533483;
+    transform: translateY(-2px);
+  }
+  .btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+  .btn.primary { background: #e94560; border-color: #e94560; }
+  .btn.primary:hover:not(:disabled) { background: #ff6b81; }
+
+  .players {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .player-card {
+    flex: 1;
+    background: linear-gradient(135deg, #0f3460 0%, #162850 100%);
+    padding: 14px 16px;
+    border-radius: 10px;
+    border: 2px solid #1a3a6a;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+  }
+  .player-card.active { border-color: #f5a623; box-shadow: 0 0 12px rgba(245,166,35,0.2); }
+  .player-card.dead { opacity: 0.35; filter: grayscale(60%); }
+  .player-name { font-size: 17px; font-weight: bold; margin-bottom: 2px; }
+  .player-class { font-size: 12px; color: #8899aa; margin-bottom: 8px; }
+  .stat-row {
+    display: flex; align-items: baseline; gap: 6px;
+    margin: 4px 0; font-size: 13px; line-height: 1.3;
+  }
+  .stat-label { min-width: 28px; color: #8899aa; font-size: 11px; flex-shrink: 0; }
+  .stat-num { min-width: 24px; font-size: 12px; color: #ccc; flex-shrink: 0; }
+  .stat-symbols { max-width: 200px; overflow: hidden; white-space: nowrap; }
+  .hearts { color: #e94560; }
+  .energy { color: #f5a623; }
+  .ki { color: #9d65c9; }
+  .shield { color: #4cc9f0; }
+  .lost { color: #777; font-size: 11px; font-style: italic; }
+  .rage { color: #ff4757; font-size: 12px; font-weight: bold; }
+  .debuff-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+  .debuff-tag {
+    font-size: 10px; padding: 2px 6px; border-radius: 3px;
+    background: #3a1a1a; color: #ff9a9a; border: 1px solid #5c2a2a;
+  }
+  .buff-tag {
+    font-size: 10px; padding: 2px 6px; border-radius: 3px;
+    background: #1a3a1a; color: #9affa0; border: 1px solid #2a5c2a;
+  }
+
+  .log {
+    background: #0d1b2a;
+    padding: 12px;
+    border-radius: 6px;
+    min-height: 120px;
+    max-height: 220px;
+    overflow-y: auto;
+    font-size: 14px;
+    line-height: 1.7;
+    margin-bottom: 16px;
+    border-left: 3px solid #533483;
+  }
+  .log p { margin: 2px 0; }
+  .log .turn-header { color: #f5a623; font-weight: bold; margin-top: 8px; }
+  .log .damage { color: #e94560; }
+  .log .defend { color: #4cc9f0; }
+  .log .cancel { color: #b8b8ff; }
+  .log .recover { color: #90ee90; }
+  .log .ki { color: #c59ae0; }
+  .log .destroy { color: #ff9770; }
+
+  .phase-area { text-align: center; padding: 12px 0; }
+  .phase-title { font-size: 20px; margin-bottom: 12px; color: #f5a623; }
+  .actions { display: flex; flex-wrap: wrap; justify-content: center; }
+  .action-btn {
+    min-width: 130px;
+    padding: 12px 10px;
+    font-size: 15px;
+  }
+  .handoff-screen {
+    padding: 60px 20px;
+    background: #000;
+    border-radius: 8px;
+    text-align: center;
+  }
+  .handoff-screen h2 { color: #e94560; font-size: 26px; margin-bottom: 20px; }
+  .handoff-screen p { margin-bottom: 20px; color: #aaa; }
+
+  .reveal {
+    display: flex;
+    justify-content: space-around;
+    background: #0d1b2a;
+    padding: 16px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+  }
+  .reveal-item { text-align: center; }
+  .reveal-item .who { color: #aaa; margin-bottom: 6px; font-size: 13px; }
+  .reveal-item .what { font-size: 20px; color: #f5a623; font-weight: bold; }
+
+  input[type="text"] {
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 2px solid #533483;
+    background: #0f3460;
+    color: #fff;
+    font-size: 15px;
+    margin: 4px;
+    font-family: inherit;
+  }
+  label { display: block; margin: 10px 0 4px; color: #aaa; font-size: 14px; }
+
+  .char-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 10px 0;
+  }
+  .char-card {
+    background: #0f3460;
+    border: 2px solid #533483;
+    border-radius: 8px;
+    padding: 8px 14px;
+    cursor: pointer;
+    transition: all 0.15s;
+    min-width: 100px;
+    text-align: center;
+  }
+  .char-card:hover { background: #1a4777; transform: translateY(-2px); }
+  .char-card.selected { border-color: #e94560; background: #1a4777; }
+  .char-card h3 { color: #e94560; margin-bottom: 0; font-size: 15px; }
+  .char-desc-box {
+    background: #0d1b2a;
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin-top: 10px;
+    font-size: 13px;
+    color: #bbb;
+    line-height: 1.6;
+    white-space: pre-line;
+    min-height: 60px;
+    border-left: 3px solid #533483;
+  }
+
+  .hint-box {
+    background: #0d1b2a;
+    border-left: 3px solid #f5a623;
+    padding: 10px 14px;
+    font-size: 12px;
+    color: #bbb;
+    border-radius: 4px;
+    margin-bottom: 12px;
+    line-height: 1.6;
+    display: none;
+  }
+  .hint-box.show { display: block; }
+  .hint-box strong { color: #f5a623; }
+
+  .action-btn { position: relative; min-width: 110px; }
+  .action-btn .cost-tag { font-size: 11px; color: #aaa; display: block; margin-top: 2px; }
+  .action-tags { display: flex; flex-wrap: wrap; gap: 3px; justify-content: center; margin-top: 4px; }
+  .atag { font-size: 10px; padding: 1px 5px; border-radius: 3px; line-height: 1.4; }
+  .atag.phys { background: #5c3a1a; color: #fca; }
+  .atag.magic { background: #3a1a5c; color: #caf; }
+  .atag.dmg { background: #5c1a1a; color: #faa; }
+  .atag.cc { background: #1a5c3a; color: #afc; }
+  .atag.util { background: #2a2a4a; color: #bbf; }
+  .atag.special { background: #5c1a4a; color: #faf; }
+  .action-btn.skill { border-color: #e94560; }
+  .action-btn .detail-tip {
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #0d1b2a;
+    border: 1px solid #533483;
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 12px;
+    color: #ccc;
+    white-space: nowrap;
+    z-index: 10;
+    pointer-events: none;
+    line-height: 1.5;
+    min-width: 220px;
+    max-width: 360px;
+    white-space: pre-wrap;
+  }
+  .action-btn:hover .detail-tip { display: block; }
+  .detail-tip .ext { display: none; margin-top: 4px; padding-top: 4px; border-top: 1px solid #533483; color: #aaa; font-size: 11px; }
+  body.ctrl-held .detail-tip .ext { display: block; }
+  body.ctrl-held .detail-tip .ctrl-hint { display: none; }
+  .ctrl-hint { color: #555; font-size: 10px; margin-top: 4px; font-style: italic; }
+
+  .player-card { position: relative; }
+  .player-card .passive-tip {
+    display: none;
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0; right: 0;
+    background: #0d1b2a;
+    border: 1px solid #533483;
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 12px;
+    color: #bbb;
+    z-index: 10;
+    white-space: pre-line;
+    line-height: 1.5;
+  }
+  .player-card:hover .passive-tip { display: block; }
+
+  .changelog {
+    background: #0d1b2a;
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-top: 18px;
+    max-height: 400px;
+    overflow-y: auto;
+    border-left: 3px solid #f5a623;
+  }
+  .changelog h3 {
+    color: #f5a623;
+    font-size: 15px;
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .changelog .version-block { margin-bottom: 12px; }
+  .changelog .version-block:last-child { margin-bottom: 0; }
+  .changelog .version-head {
+    font-size: 14px;
+    color: #e94560;
+    font-weight: bold;
+    margin-bottom: 4px;
+  }
+  .changelog .version-head .date {
+    color: #888;
+    font-weight: normal;
+    font-size: 12px;
+    margin-left: 8px;
+  }
+  .changelog .entry {
+    font-size: 13px;
+    color: #ccc;
+    margin: 3px 0 3px 8px;
+    line-height: 1.5;
+  }
+  .changelog .tag {
+    display: inline-block;
+    font-size: 11px;
+    padding: 1px 6px;
+    border-radius: 3px;
+    margin-right: 6px;
+    font-weight: bold;
+  }
+  .tag.new { background: #2d6a4f; color: #b7efc5; }
+  .tag.adjust { background: #6a4c2d; color: #ffd89b; }
+  .tag.fix { background: #4c2d6a; color: #d9b7ef; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<!-- 全局注册表 -->
+<script>
+const ELEMENTS = { PHYSICAL: 'physical', MAGIC: 'magic' };
+const elName = e => e === ELEMENTS.PHYSICAL ? '物理' : '魔法';
+const ACTIONS = {};
+const CHARACTERS = {};
+const CHANGELOG = [];
+</script>
+
+<!-- 数据：基础动作 + 角色（加新角色只需加一个文件 + 一行 script） -->
+<script src="data/base.js"></script>
+<script src="data/char_default.js"></script>
+<script src="data/char_zoro.js"></script>
+<script src="data/char_iron.js"></script>
+<script src="data/char_mage.js"></script>
+<script src="data/char_assassin.js"></script>
+<script src="data/char_otaku.js"></script>
+<script src="data/changelog.js"></script>
+
+<!-- AI -->
+<script src="ai.js"></script>
+
+<!-- 引擎 + UI -->
+<script>
+// ============================================================
+// 角色实例 + 工具函数
+// ============================================================
+function makePlayer(name, charId) {
+  const c = CHARACTERS[charId];
+  return {
+    name,
+    characterId: charId,
+    className: c.name,
+    hp: c.maxHp, maxHp: c.maxHp,
+    energy: 0, maxEnergy: c.maxEnergy,
+    ki: 0, shield: 0,
+    cola: c.initialCola || 0,
+    lostDefenses: [],
+    bannedActions: [],
+    passives: [...(c.passives || [])],
+    shieldDecay: c.shieldDecay || 0,
+    baseActions: [...c.actions],
+    rageTurns: 0,
+    pendingRageTurns: 0,
+    throwCharges: 0,
+    pendingThrowCharges: 0,
+    stunTurns: 0,
+    pendingStunTurns: 0,
+    skillMultiplier: 1,
+    lastSkillUsed: null,      // 上回合用的技能 id（法师愤怒连击）
+    currentSkillUsed: null,   // 本回合用的技能 id
+    freeCharges: { wand: 0, miehun: 0, shizi: 0 },
+    bloodChargeIndex: 0,      // 法师被动2轮转：0=wand,1=miehun,2=shizi
+    wasAboveHalfHp: true,     // 法师被动2：是否在半血以上
+    passivesDisabledThisTurn: false,
+    // 刺客相关
+    cooldowns: {},           // { groupId: turnsLeft }
+    usedOnceSkills: [],      // 一局一次已用
+    unlockedSkills: [],      // 遁入暗影解锁
+    immuneThisTurn: false,
+    poisonStacks: 0,         // 内力中毒层数
+    puppetTarget: null,      // 本回合可操纵的对手 id
+    pendingPuppetTarget: null,
+  };
+}
+
+function hasPassive(p, id) {
+  return p.passives && p.passives.includes(id) && !p.passivesDisabledThisTurn;
+}
+
+function hasAnyDebuff(p) {
+  return p.stunTurns > 0
+    || p.rageTurns > 0 || p.pendingRageTurns > 0
+    || (p.lostDefenses && p.lostDefenses.length > 0)
+    || (p.bannedActions && p.bannedActions.length > 0)
+    || p.poisonStacks > 0;
+}
+
+function canPayAction(p, actionId) {
+  const a = ACTIONS[actionId];
+  if (a.hpCost > 0 && p.hp <= a.hpCost) return false;
+  if ((p.freeCharges || {})[actionId] > 0) return true;
+  return p.energy >= a.cost;
+}
+
+function formatHp(hp) {
+  return Number.isInteger(hp) ? hp.toString() : hp.toFixed(1);
+}
+
+function adaptiveSymbols(symbol, count) {
+  const n = Math.ceil(count);
+  if (n <= 0) return '';
+  if (n > 30) return `<span style="font-size:11px;">${symbol} x${n}</span>`;
+  let sz, sp;
+  if (n <= 8) { sz = 14; sp = 2; }
+  else if (n <= 15) { sz = 11; sp = 1; }
+  else { sz = 8; sp = 0; }
+  return `<span style="font-size:${sz}px;letter-spacing:${sp}px;">${symbol.repeat(n)}</span>`;
+}
+
+function actionDetailText(a) {
+  const p = [];
+  if (a.element && a.element !== 'neutral') p.push(elName(a.element) + '属性');
+  else if (a.element === 'neutral') p.push('无属性');
+  if (a.targeting === 'all') p.push('群体');
+  if (a.targeting === 'single') p.push('单体');
+  if (a.nonBeam) p.push('非束（不参与束碰撞/吸）');
+  if (a.baseDamage !== undefined) p.push(`基础伤害 ${a.baseDamage}`);
+  if (a.hpCost) p.push(`消耗 ${a.hpCost} HP`);
+  if (a.destroyUsedDefense) p.push('摧毁目标使用的防御');
+  if (a.destroyCrossElementOpposing) p.push('消灭对向异属性束');
+  if (a.inflictRageOnTarget) p.push('指向即施加激怒');
+  if (a.inflictPoison) p.push(`施加内力中毒 ${a.inflictPoison} 层`);
+  if (a.stunPerHit) p.push(`命中 +${a.stunPerHit} 回合眩晕`);
+  if (a.grantsPuppet) p.push('命中后操纵对方');
+  if (a.grantsImmunity) p.push('本回合免疫一切（十字封禁除外）');
+  if (a.oncePerGame) p.push('一局限一次');
+  if (a.multiplierEffect === 'damage') p.push('连击加成：伤害翻倍');
+  if (a.multiplierEffect === 'beamCount') p.push('连击加成：束数翻倍');
+  if (a.cooldownGroup) p.push(`冷却 ${a.cooldownTurns} 回合`);
+  if (a.onHit && a.onHit.refundEnergy) p.push(`命中回 ${a.onHit.refundEnergy} 能量`);
+  if (a.unlocks) p.push(`解锁：${a.unlocks.map(id => ACTIONS[id] ? ACTIONS[id].name : id).join('、')}`);
+  return p.join('\n');
+}
+
+function actionBriefTags(a) {
+  const t = [];
+  if (a.baseBeams) t.push({ text: '物+魔', cls: 'phys' });
+  else if (a.element === 'neutral') t.push({ text: '无属性', cls: 'special' });
+  else if (a.element === ELEMENTS.PHYSICAL) t.push({ text: '物理', cls: 'phys' });
+  else if (a.element === ELEMENTS.MAGIC) t.push({ text: '魔法', cls: 'magic' });
+  if (a.targeting === 'all') t.push({ text: '群', cls: 'util' });
+  if (a.nonBeam) t.push({ text: '非束', cls: 'util' });
+  const dmg = a.baseDamage !== undefined ? a.baseDamage : (a.category === 'attack' && !a.baseBeams && !a.damageFrom && !a.voidAndBan ? 1 : 0);
+  if (dmg > 0) t.push({ text: dmg + '伤', cls: 'dmg' });
+  if (a.damageFrom === 'throwCharges') t.push({ text: 'N伤', cls: 'dmg' });
+  if (a.stunPerHit) t.push({ text: '眩晕', cls: 'cc' });
+  if (a.inflictRageOnTarget) t.push({ text: '激怒', cls: 'cc' });
+  if (a.inflictPoison) t.push({ text: '中毒', cls: 'cc' });
+  if (a.grantsPuppet) t.push({ text: '操纵', cls: 'cc' });
+  if (a.destroyUsedDefense) t.push({ text: '破甲', cls: 'special' });
+  if (a.destroyCrossElementOpposing) t.push({ text: '灭束', cls: 'special' });
+  if (a.onHit && a.onHit.refundEnergy) t.push({ text: '回能', cls: 'util' });
+  if (a.grantsImmunity) t.push({ text: '免疫', cls: 'special' });
+  if (a.voidAndBan) t.push({ text: '封印', cls: 'special' });
+  if (a.absorbsAll) t.push({ text: '拉束', cls: 'util' });
+  if (a.ironShield) t.push({ text: '+盾', cls: 'util' });
+  return t.map(x => `<span class="atag ${x.cls}">${x.text}</span>`).join('');
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Control') document.body.classList.add('ctrl-held'); });
+document.addEventListener('keyup', e => { if (e.key === 'Control') document.body.classList.remove('ctrl-held'); });
+
+const BLOOD_CHARGE_ORDER = ['wand', 'miehun', 'shizi'];
+function checkMageBloodCharge(p, log) {
+  if (!p.passives || !p.passives.includes('mageCharges')) return;
+  if (p.hp <= p.maxHp / 2 && p.wasAboveHalfHp && p.hp > 0) {
+    p.wasAboveHalfHp = false;
+    const skillId = BLOOD_CHARGE_ORDER[p.bloodChargeIndex % 3];
+    p.freeCharges[skillId] = (p.freeCharges[skillId] || 0) + 1;
+    p.bloodChargeIndex += 1;
+    log.push({ type: 'recover', text: `${p.name}「啊？我流血啦？」获得【${ACTIONS[skillId].name}】免费券！` });
+  }
+  if (p.hp > p.maxHp / 2) p.wasAboveHalfHp = true;
+}
+
+function playerAvailableActions(p) {
+  return p.baseActions.filter(a => {
+    if (p.lostDefenses.includes(a)) return false;
+    if (p.bannedActions.includes(a)) return false;
+    const act = ACTIONS[a];
+    if (act.canUse && !act.canUse(p)) return false;
+    if (act.oncePerGame && p.usedOnceSkills.includes(a)) return false;
+    if (act.requiresUnlock && !p.unlockedSkills.includes(a)) return false;
+    if (act.cooldownGroup && (p.cooldowns[act.cooldownGroup] || 0) > 0) return false;
+    return true;
+  });
+}
+
+// ============================================================
+// 状态
+// ============================================================
+const state = {
+  screen: 'menu',
+  mode: null,
+  players: [],
+  choices: [],
+  phase: null,
+  log: [],
+  turn: 1,
+  winner: null,
+  setup: { p1Char: 'default', p2Char: 'default' },
+};
+
+// ============================================================
+// 结算引擎
+// ============================================================
+
+function resolveTurn(choices, players) {
+  const log = [];
+  log.push({ type: 'turn-header', text: `—— 第 ${state.turn} 回合 ——` });
+
+  for (const p of players) { p.passivesDisabledThisTurn = false; p.usedSkillThisTurn = false; p.immuneThisTurn = false; p.drunkConsumed = 0; }
+
+  for (const c of choices) {
+    const p = players[c.playerId];
+    if (c.stunned) continue;
+    const a = ACTIONS[c.action];
+    let desc = `${p.name} 选择【${a.name}】`;
+    if (a.category === 'attack' && a.targeting === 'single') desc += `，目标：${players[c.target].name}`;
+    else if (a.targeting === 'all') desc += `（群体）`;
+    log.push({ type: 'plain', text: desc });
+  }
+
+  const voided = new Set();
+
+  // 0a. 眩晕
+  const stunnedThisTurn = new Set();
+  for (const c of choices) {
+    const p = players[c.playerId];
+    if (p.stunTurns > 0) {
+      voided.add(c.playerId);
+      stunnedThisTurn.add(c.playerId);
+      log.push({ type: 'cancel', text: `${p.name} 被眩晕，本回合无法行动（剩余眩晕 ${p.stunTurns} 回合）。` });
+    }
+  }
+
+  // 0b. 十字封禁
+  const shiziChoices = choices.filter(c => !voided.has(c.playerId) && ACTIONS[c.action].priority === 'highest');
+  for (const c of shiziChoices) {
+    const a = ACTIONS[c.action];
+    const attacker = players[c.playerId];
+    if (attacker.freeCharges[c.action] > 0) {
+      attacker.freeCharges[c.action] -= 1;
+      log.push({ type: 'recover', text: `${attacker.name} 消耗【${a.name}】免费券。` });
+    } else if (a.cost > 0) {
+      attacker.energy -= a.cost;
+    }
+    attacker.usedSkillThisTurn = true;
+    attacker.currentSkillUsed = c.action;
+    if (a.voidAndBan) {
+      const target = players[c.target];
+      const targetChoice = choices.find(cc => cc.playerId === c.target);
+      if (target.hp > 0) {
+        voided.add(c.target);
+        if (a.disableTargetPassives) target.passivesDisabledThisTurn = true;
+        if (targetChoice && !target.bannedActions.includes(targetChoice.action)) {
+          target.bannedActions.push(targetChoice.action);
+          log.push({ type: 'destroy', text: `${target.name} 的【${ACTIONS[targetChoice.action].name}】被【${a.name}】永久封禁！` });
+        }
+        log.push({ type: 'destroy', text: `${target.name} 本回合动作失效、被动失效。` });
+      }
+    }
+  }
+
+  // 0c. 激怒死亡
+  const ragedThisTurn = new Set();
+  for (const c of choices) {
+    if (voided.has(c.playerId)) continue;
+    const p = players[c.playerId];
+    const a = ACTIONS[c.action];
+    if (p.rageTurns > 0) {
+      ragedThisTurn.add(c.playerId);
+      if (a.kind !== 'skill') {
+        p.hp = 0;
+        voided.add(c.playerId);
+        log.push({ type: 'damage', text: `${p.name} 激怒下未使用技能，直接出局！` });
+      }
+    }
+  }
+
+  const notVoided = (c) => !voided.has(c.playerId);
+
+  // 1. 支付 + 被动 + HP 代价 + 中毒 + 免疫 + 冷却
+  const oppressionTargets = new Set();  // 压制：目标 playerId
+  for (const c of choices) {
+    if (!notVoided(c)) continue;
+    const p = players[c.playerId];
+    const a = ACTIONS[c.action];
+    if (a.priority === 'highest') continue;
+
+    // 阿宅「恰到好处」检查（在任何费用扣除前）
+    if (hasPassive(p, 'otakuOppression') && a.kind === 'skill' && p.hp === p.cola && (a.targeting === 'single' || a.targeting === 'all')) {
+      if (a.targeting === 'all') {
+        players.forEach((_, id) => { if (id !== c.playerId) oppressionTargets.add(id); });
+      } else {
+        oppressionTargets.add(c.target);
+      }
+      log.push({ type: 'destroy', text: `${p.name}「恰到好处」（HP ${formatHp(p.hp)} = 可乐 ${formatHp(p.cola)}），【${a.name}】施加压制！` });
+    }
+
+    // 能量支付（木偶借用：扣对方能量；dynamicCost 另外处理）
+    if (a.cost > 0) {
+      if (c.puppet) {
+        players[c.puppetSource].energy -= a.cost;
+        log.push({ type: 'recover', text: `${p.name} 操纵消耗 ${players[c.puppetSource].name} ${a.cost} 能量。` });
+      } else if (p.freeCharges[c.action] > 0) {
+        p.freeCharges[c.action] -= 1;
+        log.push({ type: 'recover', text: `${p.name} 消耗【${a.name}】免费券。` });
+      } else {
+        p.energy -= a.cost;
+      }
+    }
+
+    // 动态消耗
+    if (a.dynamicCost === 'allEnergy') {
+      const consumed = p.energy;
+      p.energy = 0;
+      p.cola = (p.cola || 0) + consumed;
+      log.push({ type: 'recover', text: `${p.name} 痛饮：消耗 ${consumed} 能量 → +${consumed} 可乐（共 ${formatHp(p.cola)}）。` });
+    }
+    if (a.dynamicCost === 'allCola') {
+      p.drunkConsumed = p.cola || 0;
+      p.cola = 0;
+      log.push({ type: 'ki', text: `${p.name} 醉酒狂暴：耗尽 ${formatHp(p.drunkConsumed)} 可乐。` });
+    }
+
+    // HP 代价
+    if (a.hpCost > 0) {
+      p.hp -= a.hpCost;
+      log.push({ type: 'damage', text: `${p.name} 使用【${a.name}】消耗 ${a.hpCost} HP（HP ${formatHp(p.hp)}）。` });
+      checkMageBloodCharge(p, log);
+      // 阿宅：HP 代价技能 → 等量可乐
+      if (hasPassive(p, 'otakuCola')) {
+        p.cola = (p.cola || 0) + a.hpCost;
+        log.push({ type: 'recover', text: `${p.name}「肥宅生活」+${a.hpCost} 可乐（共 ${formatHp(p.cola)}）。` });
+      }
+      if (p.hp <= 0) { p.hp = 0; voided.add(c.playerId); log.push({ type: 'damage', text: `${p.name} HP 耗尽！` }); continue; }
+    }
+
+    if (a.kind === 'skill') { p.usedSkillThisTurn = true; p.currentSkillUsed = c.action; }
+
+    // 内力中毒：使用技能时扣血
+    if (p.poisonStacks > 0 && a.kind === 'skill') {
+      const dmg = 0.5 * p.poisonStacks;
+      p.hp -= dmg;
+      log.push({ type: 'damage', text: `${p.name} 内力中毒发作（${p.poisonStacks} 层），失去 ${dmg} HP（HP ${formatHp(p.hp)}）。` });
+      checkMageBloodCharge(p, log);
+      if (p.hp <= 0) { p.hp = 0; voided.add(c.playerId); log.push({ type: 'damage', text: `${p.name} 中毒致死！` }); continue; }
+    }
+
+    // 遁入暗影：免疫 + 一局一次 + 解锁
+    if (a.grantsImmunity) {
+      p.immuneThisTurn = true;
+      log.push({ type: 'defend', text: `${p.name} 遁入暗影，本回合免疫一切！` });
+      if (a.oncePerGame) p.usedOnceSkills.push(c.action);
+      if (a.unlocks) { p.unlockedSkills.push(...a.unlocks); log.push({ type: 'recover', text: `${p.name} 解锁了：${a.unlocks.map(id => ACTIONS[id].name).join('、')}。` }); }
+    }
+
+    // 冷却触发
+    if (a.cooldownGroup) {
+      p.cooldowns[a.cooldownGroup] = a.cooldownTurns || 1;
+    }
+
+    // 木偶操纵时跳过被动
+    if (c.puppet) continue;
+
+    // 被动
+    if (hasPassive(p, 'zoroKi') && a.isSword) {
+      const before = p.ki;
+      p.ki = Math.min(4, p.ki + (a.kiBonus || 1));
+      const actual = p.ki - before;
+      if (actual > 0) log.push({ type: 'ki', text: `${p.name} 使用【${a.name}】积攒 ${actual} 气（${p.ki}/4）。` });
+    }
+    if (hasPassive(p, 'ironPassive') && a.kind === 'skill') {
+      p.shield += 1;
+      log.push({ type: 'defend', text: `${p.name} 使用技能，铁皮被动 +1 护盾（共 ${p.shield}）。` });
+    }
+    if (a.ironShield) {
+      p.shield += 1;
+      log.push({ type: 'defend', text: `${p.name} 架起铁皮防御，+1 护盾（共 ${p.shield}）。` });
+    }
+  }
+
+  // 1.5. 压制：作废目标的非基础动作
+  for (const id of oppressionTargets) {
+    const targetChoice = choices.find(cc => cc.playerId === id);
+    if (!targetChoice || voided.has(id)) continue;
+    const ta = ACTIONS[targetChoice.action];
+    if (ta.kind !== 'basic') {
+      voided.add(id);
+      log.push({ type: 'destroy', text: `${players[id].name} 的【${ta.name}】被压制失效！` });
+    } else {
+      log.push({ type: 'plain', text: `${players[id].name} 选了基础动作【${ta.name}】，压制未生效。` });
+    }
+  }
+
+  // 2. 崩激怒
+  for (const c of choices) {
+    if (!notVoided(c)) continue;
+    const a = ACTIONS[c.action];
+    if (!a.inflictRageOnTarget) continue;
+    const t = players[c.target];
+    if (t.hp > 0 && !t.immuneThisTurn) {
+      t.pendingRageTurns += 1;
+      log.push({ type: 'destroy', text: `${t.name} 被【${a.name}】指向，激怒 +1 回合（待生效 ${t.pendingRageTurns}）！` });
+    }
+  }
+
+  // 3. 吸重定向
+  const absorbers = choices.filter(c => notVoided(c) && ACTIONS[c.action].absorbsAll).map(c => c.playerId);
+  let absorbingId = null;
+  if (absorbers.length === 1) {
+    absorbingId = absorbers[0];
+    log.push({ type: 'destroy', text: `${players[absorbingId].name} 发动【吸】，所有束被拉向自己！` });
+  } else if (absorbers.length > 1) {
+    log.push({ type: 'cancel', text: `多人同时使用【吸】，束无法汇聚（效果抵消）。` });
+  }
+
+  // 4. 束展开
+  const beams = [];
+  let bid = 0;
+  for (const c of choices) {
+    if (!notVoided(c)) continue;
+    const a = ACTIONS[c.action];
+    if (a.category !== 'attack') continue;
+    if (a.priority === 'highest') continue;
+
+    const attacker = players[c.playerId];
+    const mult = (hasPassive(attacker, 'mageMultiplier') && c.action === attacker.lastSkillUsed && attacker.lastSkillUsed)
+      ? (attacker.skillMultiplier || 1) : 1;
+
+    // 非束不受吸重定向
+    const baseTargets = (absorbingId !== null && !a.nonBeam)
+      ? [absorbingId]
+      : (a.targeting === 'all'
+          ? players.map((_, id) => id).filter(id => id !== c.playerId)
+          : [c.target]);
+
+    if (a.id === 'miehun') {
+      const nP = (a.baseBeams.physical || 0) * mult;
+      const nM = (a.baseBeams.magic || 0) * mult;
+      for (let i = 0; i < nP; i++) beams.push({ bid: bid++, choice: c, action: a, element: ELEMENTS.PHYSICAL, damage: 0, stunApply: a.stunPerHit || 0, targets: baseTargets });
+      for (let i = 0; i < nM; i++) beams.push({ bid: bid++, choice: c, action: a, element: ELEMENTS.MAGIC, damage: 0, stunApply: a.stunPerHit || 0, targets: baseTargets });
+      if (mult > 1) log.push({ type: 'ki', text: `${attacker.name} 的【${a.name}】倍率 x${mult}：物 ${nP} 束 + 魔 ${nM} 束。` });
+    } else {
+      let damage = a.baseDamage !== undefined ? a.baseDamage : 1;
+      if (a.damageFrom === 'throwCharges') damage = attacker.throwCharges;
+      if (a.damageFrom === 'colaConsumed') damage = attacker.drunkConsumed || 0;
+      if (a.multiplierEffect === 'damage') damage = damage * mult;
+      beams.push({ bid: bid++, choice: c, action: a, element: a.element, damage, stunApply: 0, targets: baseTargets, nonBeam: !!a.nonBeam });
+      if (mult > 1 && a.multiplierEffect === 'damage') log.push({ type: 'ki', text: `${attacker.name} 的【${a.name}】倍率 x${mult}：${damage} 伤害。` });
+    }
+  }
+
+  const status = {};
+  for (const b of beams) status[b.bid] = 'active';
+
+  // 5. 同属性互指抵消
+  if (absorbingId === null) {
+    for (let i = 0; i < beams.length; i++) {
+      for (let j = i + 1; j < beams.length; j++) {
+        const x = beams[i], y = beams[j];
+        if (status[x.bid] !== 'active' || status[y.bid] !== 'active') continue;
+        if (x.nonBeam || y.nonBeam) continue;
+        if (x.element !== y.element) continue;
+        if (x.choice.playerId === y.choice.playerId) continue;
+        if (x.targets.includes(y.choice.playerId) && y.targets.includes(x.choice.playerId)) {
+          status[x.bid] = 'cancelled';
+          status[y.bid] = 'cancelled';
+          log.push({
+            type: 'cancel',
+            text: `${players[x.choice.playerId].name} 的 ${x.action.name}（${elName(x.element)}束）与 ${players[y.choice.playerId].name} 的 ${y.action.name}（${elName(y.element)}束）互相抵消！`
+          });
+          break;
+        }
+      }
+    }
+  }
+
+  // 6. 消灭对向异属性束
+  for (const x of beams) {
+    if (status[x.bid] !== 'active' || x.nonBeam) continue;
+    if (!x.action.destroyCrossElementOpposing) continue;
+    let destroyedAny = false;
+    for (const y of beams) {
+      if (y.bid === x.bid || status[y.bid] !== 'active' || y.nonBeam) continue;
+      if (!y.targets.includes(x.choice.playerId)) continue;
+      if (y.element === x.element || y.element === 'neutral') continue;
+      status[y.bid] = 'destroyed';
+      destroyedAny = true;
+      log.push({ type: 'destroy', text: `${players[x.choice.playerId].name} 的【${x.action.name}】消灭了 ${players[y.choice.playerId].name} 的 ${y.action.name}（${elName(y.element)}束）！` });
+    }
+    if (destroyedAny && x.action.onDestroy && x.action.onDestroy.refundEnergy) {
+      players[x.choice.playerId].energy += x.action.onDestroy.refundEnergy;
+      log.push({ type: 'recover', text: `${players[x.choice.playerId].name} 因消灭效果回 ${x.action.onDestroy.refundEnergy} 能量。` });
+    }
+  }
+
+  // 7. 吸计数
+  if (absorbingId !== null) {
+    let count = 0;
+    for (const b of beams) if (status[b.bid] === 'active' && !b.nonBeam && b.targets.includes(absorbingId)) count += 1;
+    players[absorbingId].pendingThrowCharges = count;
+    if (count > 0) {
+      log.push({ type: 'ki', text: `${players[absorbingId].name} 吸收了 ${count} 束，下回合可用【投掷】。` });
+      const sources = new Set();
+      for (const b of beams) {
+        if (status[b.bid] === 'active' && !b.nonBeam && b.targets.includes(absorbingId)) sources.add(b.choice.playerId);
+      }
+      for (const srcId of sources) {
+        if (players[srcId].hp > 0) {
+          log.push({ type: 'damage', text: `${players[absorbingId].name} 吸收反击！` });
+          applyDamage(players[srcId], 1, log, players[absorbingId].name, '吸');
+        }
+      }
+    } else {
+      log.push({ type: 'plain', text: `${players[absorbingId].name} 本回合未吸到束，投掷未解锁。` });
+    }
+  }
+
+  // 8. 防御
+  const defenseOf = {};
+  for (const c of choices) {
+    if (!notVoided(c)) continue;
+    const a = ACTIONS[c.action];
+    if (a.category === 'defend' && !a.ironShield) defenseOf[c.playerId] = c.action;
+  }
+
+  // 9. 伤害结算（含免疫、非束效果、中毒施加、木偶）
+  for (const b of beams) {
+    if (status[b.bid] !== 'active') continue;
+    const attacker = players[b.choice.playerId];
+
+    for (const targetId of b.targets) {
+      const target = players[targetId];
+      if (target.hp <= 0) continue;
+
+      // 免疫（遁入暗影）
+      if (target.immuneThisTurn) {
+        status[b.bid] = 'immune';
+        log.push({ type: 'defend', text: `${target.name} 遁入暗影，免疫了 ${attacker.name} 的【${b.action.name}】！` });
+        continue;
+      }
+
+      const defActionId = defenseOf[targetId];
+      const defAction = defActionId ? ACTIONS[defActionId] : null;
+      const blocked = defAction && defAction.element === b.element;
+
+      if (blocked) {
+        status[b.bid] = 'blocked';
+        log.push({ type: 'defend', text: `${target.name} 用【${defAction.name}】挡住了 ${attacker.name} 的【${b.action.name}】${b.nonBeam ? '' : '（' + elName(b.element) + '束）'}！` });
+        if (b.action.destroyUsedDefense && !target.lostDefenses.includes(defActionId)) {
+          target.lostDefenses.push(defActionId);
+          log.push({ type: 'destroy', text: `${target.name} 的【${ACTIONS[defActionId].name}】被【${b.action.name}】永久摧毁！` });
+        }
+        continue;
+      }
+
+      // 命中
+      let result;
+      if (b.damage > 0) {
+        result = applyDamage(target, b.damage, log, attacker.name, b.action.name);
+      } else {
+        result = { hit: true, totalDealt: 0 };
+        const label = b.nonBeam ? '' : `（${elName(b.element)}束）`;
+        log.push({ type: 'plain', text: `${attacker.name} 的【${b.action.name}】${label}命中 ${target.name}。` });
+      }
+
+      if (result.hit) {
+        if (status[b.bid] === 'active') status[b.bid] = 'hit';
+
+        // 眩晕
+        if (b.stunApply > 0) {
+          target.pendingStunTurns += b.stunApply;
+          log.push({ type: 'destroy', text: `${target.name} 累积眩晕 +${b.stunApply} 回合。` });
+        }
+        // 居合/三千世界 命中回能
+        if (b.action.onHit && b.action.onHit.refundEnergy) {
+          attacker.energy += b.action.onHit.refundEnergy;
+          log.push({ type: 'recover', text: `${attacker.name} 的【${b.action.name}】命中，回 ${b.action.onHit.refundEnergy} 能量。` });
+        }
+        // 法师吸血
+        if (hasPassive(attacker, 'mageLifesteal') && hasAnyDebuff(target) && result.totalDealt > 0) {
+          attacker.hp += result.totalDealt;
+          log.push({ type: 'recover', text: `${attacker.name} 吸血 ${result.totalDealt} HP（HP ${formatHp(attacker.hp)}）。` });
+        }
+        // 致命毒药：施加内力中毒
+        if (b.action.inflictPoison) {
+          target.poisonStacks += b.action.inflictPoison;
+          log.push({ type: 'destroy', text: `${target.name} 被施加内力中毒（共 ${target.poisonStacks} 层，每用技能 -${target.poisonStacks * 0.5} HP）。` });
+        }
+        // 木偶操纵：眩晕 + 下回合操纵
+        if (b.action.grantsPuppet) {
+          target.pendingStunTurns += 1;
+          attacker.pendingPuppetTarget = targetId;
+          log.push({ type: 'destroy', text: `${target.name} 被木偶操纵！下回合眩晕，${attacker.name} 可借用其技能。` });
+        }
+      }
+
+      // 秋水摧毁防御（命中或挡住都触发）
+      if (b.action.destroyUsedDefense && defActionId && !target.lostDefenses.includes(defActionId)) {
+        target.lostDefenses.push(defActionId);
+        log.push({ type: 'destroy', text: `${target.name} 的【${ACTIONS[defActionId].name}】被【${b.action.name}】永久摧毁！` });
+      }
+    }
+  }
+
+  // 10. 投掷消耗
+  for (const c of choices) {
+    if (!notVoided(c)) continue;
+    if (ACTIONS[c.action].damageFrom === 'throwCharges') players[c.playerId].throwCharges = 0;
+  }
+
+  // 11. 回能
+  for (const c of choices) {
+    if (!notVoided(c)) continue;
+    const a = ACTIONS[c.action];
+    if (a.category === 'recover') {
+      players[c.playerId].energy += 1;
+      log.push({ type: 'recover', text: `${players[c.playerId].name} 回 1 能量（共 ${players[c.playerId].energy}）。` });
+    }
+  }
+
+  // 回合末生命周期
+  for (const p of players) {
+    if (p.shield > 0) {
+      const before = p.shield;
+      if (p.shieldDecay === 'full') p.shield = 0;
+      else if (p.shieldDecay > 0) p.shield = Math.max(0, p.shield - p.shieldDecay);
+      if (p.shield !== before) log.push({ type: 'defend', text: `${p.name} 的护盾衰减 ${before - p.shield}（剩 ${p.shield}）。` });
+    }
+  }
+  for (const id of ragedThisTurn) {
+    players[id].rageTurns = Math.max(0, players[id].rageTurns - 1);
+  }
+  for (const p of players) {
+    if (p.pendingRageTurns > 0) {
+      p.rageTurns += p.pendingRageTurns;
+      log.push({ type: 'destroy', text: `${p.name} 激怒回合数 ${p.rageTurns}（新增 ${p.pendingRageTurns}）。` });
+      p.pendingRageTurns = 0;
+    }
+  }
+  for (const p of players) {
+    p.throwCharges = p.pendingThrowCharges || 0;
+    p.pendingThrowCharges = 0;
+  }
+  for (const id of stunnedThisTurn) {
+    players[id].stunTurns = Math.max(0, players[id].stunTurns - 1);
+  }
+  for (const p of players) {
+    if (p.pendingStunTurns > 0) {
+      p.stunTurns += p.pendingStunTurns;
+      log.push({ type: 'destroy', text: `${p.name} 眩晕总回合数 ${p.stunTurns}（本回合新增 ${p.pendingStunTurns}）。` });
+      p.pendingStunTurns = 0;
+    }
+  }
+  for (const p of players) {
+    if (!hasPassive(p, 'mageMultiplier')) continue;
+    if (p.usedSkillThisTurn) {
+      if (p.currentSkillUsed === p.lastSkillUsed && p.lastSkillUsed) {
+        p.skillMultiplier = Math.min(64, (p.skillMultiplier || 1) * 2);
+        log.push({ type: 'ki', text: `${p.name}「愤怒连击」连续【${ACTIONS[p.currentSkillUsed].name}】，下回合倍率 x${p.skillMultiplier}。` });
+      } else {
+        p.skillMultiplier = 2;
+        log.push({ type: 'ki', text: `${p.name} 使用【${ACTIONS[p.currentSkillUsed].name}】，下回合同技能倍率 x2。` });
+      }
+      p.lastSkillUsed = p.currentSkillUsed;
+    } else {
+      if (p.skillMultiplier > 1) log.push({ type: 'ki', text: `${p.name} 未用技能，倍率归 1。` });
+      p.skillMultiplier = 1;
+      p.lastSkillUsed = null;
+    }
+    p.currentSkillUsed = null;
+  }
+  // 冷却递减
+  for (const p of players) {
+    for (const g in p.cooldowns) {
+      if (p.cooldowns[g] > 0) p.cooldowns[g] -= 1;
+    }
+  }
+  // 木偶操纵切换
+  for (const p of players) {
+    p.puppetTarget = p.pendingPuppetTarget || null;
+    p.pendingPuppetTarget = null;
+  }
+
+  return log;
+}
+
+function applyDamage(target, amount, log, attackerName, attackName) {
+  let remaining = amount;
+  let totalDealt = 0;
+
+  if (target.shield > 0) {
+    const absorbed = Math.min(remaining, target.shield);
+    target.shield -= absorbed;
+    remaining -= absorbed;
+    totalDealt += absorbed;
+    log.push({ type: 'defend', text: `${target.name} 护盾吸收 ${absorbed}（剩 ${target.shield}）。` });
+  }
+
+  // 阿宅可乐盾：护盾后、Zoro气转前吸
+  if (remaining > 0 && hasPassive(target, 'otakuCola') && target.cola > 0) {
+    const absorbed = Math.min(remaining, target.cola);
+    target.cola -= absorbed;
+    remaining -= absorbed;
+    totalDealt += absorbed;
+    log.push({ type: 'defend', text: `${target.name} 喝了 ${absorbed} 瓶可乐抵伤（剩 ${formatHp(target.cola)}）。` });
+  }
+
+  if (remaining > 0 && hasPassive(target, 'zoroKi') && target.ki >= 3) {
+    const conv = target.ki;
+    target.shield += conv;
+    target.ki = 0;
+    log.push({ type: 'ki', text: `${target.name} 将 ${conv} 气转化为等量护盾！` });
+    const absorbed = Math.min(remaining, target.shield);
+    target.shield -= absorbed;
+    remaining -= absorbed;
+    totalDealt += absorbed;
+    if (absorbed > 0) log.push({ type: 'defend', text: `${target.name} 护盾吸收 ${absorbed}（剩 ${target.shield}）。` });
+  }
+
+  if (remaining > 0) {
+    const hpDmg = Math.min(remaining, target.hp);
+    target.hp = Math.max(0, target.hp - remaining);
+    totalDealt += hpDmg;
+    log.push({ type: 'damage', text: `${attackerName} 的【${attackName}】对 ${target.name} 造成 ${remaining} 点伤害（HP ${formatHp(target.hp)}）。` });
+  }
+
+  checkMageBloodCharge(target, log);
+  return { hit: true, totalDealt };
+}
+
+function checkGameOver() {
+  const alive = state.players.filter(p => p.hp > 0);
+  if (alive.length <= 1) {
+    state.screen = 'gameover';
+    state.winner = alive.length === 1 ? alive[0] : null;
+    return true;
+  }
+  return false;
+}
+
+// ============================================================
+// 渲染
+// ============================================================
+
+const app = document.getElementById('app');
+
+function render() {
+  if (state.screen === 'menu') return renderMenu();
+  if (state.screen === 'setup') return renderSetup();
+  if (state.screen === 'playing') return renderPlaying();
+  if (state.screen === 'gameover') return renderGameOver();
+}
+
+function renderMenu() {
+  const changelogHtml = CHANGELOG.map(v => `
+    <div class="version-block">
+      <div class="version-head">${escapeHtml(v.version)}<span class="date">${escapeHtml(v.date)}</span></div>
+      ${v.entries.map(e => `
+        <div class="entry"><span class="tag ${tagClass(e.type)}">${escapeHtml(e.type)}</span>${escapeHtml(e.text)}</div>
+      `).join('')}
+    </div>
+  `).join('');
+
+  app.innerHTML = `
+    <h1>对战游戏</h1>
+    <div style="text-align:center; padding:20px 0 10px;">
+      <p style="margin-bottom:16px; color:#aaa;">选择游戏模式</p>
+      <button class="btn primary" id="btn-pvp">本地双人</button>
+      <button class="btn primary" id="btn-pve">玩家 vs AI</button>
+    </div>
+    <div style="font-size:13px; color:#888; padding:14px; background:#0d1b2a; border-radius:6px; margin-top:10px;">
+      <p><b>基础规则：</b></p>
+      <p>· 初始 HP=3，能量=0。HP 归零即败；HP 无上限（可通过吸血等手段超过初始值）。</p>
+      <p>· 每回合双方秘密选招，同时揭晓。</p>
+      <p>· 回能 +1 能量；物/魔防御免疫对应攻击；物/魔攻击 1 费 1 伤害。</p>
+      <p>· 同属性互指 → 抵消（仍扣能量）。</p>
+    </div>
+    <div class="changelog">
+      <h3>更新公告</h3>
+      ${changelogHtml}
+    </div>
+  `;
+  document.getElementById('btn-pvp').onclick = () => { state.mode = 'pvp'; state.screen = 'setup'; render(); };
+  document.getElementById('btn-pve').onclick = () => { state.mode = 'pve'; state.screen = 'setup'; render(); };
+}
+
+function tagClass(type) {
+  if (type === '新增') return 'new';
+  if (type === '调整') return 'adjust';
+  if (type === '修复') return 'fix';
+  return 'adjust';
+}
+
+function renderSetup() {
+  const p2Default = state.mode === 'pve' ? '电脑' : '玩家2';
+  const charList = Object.values(CHARACTERS);
+
+  const charCards = (side) => charList.map(c => `
+    <div class="char-card ${state.setup[side+'Char']===c.id?'selected':''}" data-side="${side}" data-char="${c.id}">
+      <h3>${escapeHtml(c.name)}</h3>
+    </div>
+  `).join('');
+
+  const descBox = (side) => {
+    const sel = CHARACTERS[state.setup[side+'Char']];
+    return sel ? `<div class="char-desc-box">${escapeHtml(sel.desc)}</div>` : '';
+  };
+
+  app.innerHTML = `
+    <h1>对战设置</h1>
+    <div style="padding:10px 8px;">
+      <label>玩家 1 名字</label>
+      <input type="text" id="name1" value="玩家1" maxlength="8">
+      <h2 style="margin-top:10px;">玩家 1 角色</h2>
+      <div class="char-grid">${charCards('p1')}</div>
+      ${descBox('p1')}
+
+      <label style="margin-top:16px;">${state.mode === 'pve' ? 'AI 名字' : '玩家 2 名字'}</label>
+      <input type="text" id="name2" value="${p2Default}" maxlength="8">
+      <h2 style="margin-top:10px;">${state.mode === 'pve' ? 'AI' : '玩家 2'} 角色</h2>
+      <div class="char-grid">${charCards('p2')}</div>
+      ${descBox('p2')}
+
+      <div style="margin-top:20px; text-align:center;">
+        <button class="btn" id="btn-back">返回</button>
+        <button class="btn primary" id="btn-start">开始对战</button>
+      </div>
+    </div>
+  `;
+  document.querySelectorAll('.char-card').forEach(el => {
+    el.onclick = () => {
+      const side = el.dataset.side;
+      state.setup[side+'Char'] = el.dataset.char;
+      renderSetup();
+    };
+  });
+  document.getElementById('btn-back').onclick = () => { state.screen = 'menu'; render(); };
+  document.getElementById('btn-start').onclick = () => {
+    const n1 = document.getElementById('name1').value.trim() || '玩家1';
+    const n2 = document.getElementById('name2').value.trim() || p2Default;
+    startGame(n1, n2, state.setup.p1Char, state.setup.p2Char);
+  };
+}
+
+function startGame(n1, n2, c1, c2) {
+  state.players = [makePlayer(n1, c1), makePlayer(n2, c2)];
+  state.choices = [];
+  state.log = [];
+  state.turn = 1;
+  state.phase = 'select0';
+  state.screen = 'playing';
+  state.winner = null;
+  render();
+}
+
+function statusCardHtml(p) {
+  const h = [];
+  h.push(`<div class="player-name">${escapeHtml(p.name)}</div>`);
+  h.push(`<div class="player-class">${escapeHtml(p.className)}</div>`);
+
+  h.push(`<div class="stat-row"><span class="stat-label">HP</span><span class="stat-num">${formatHp(p.hp)}</span><span class="stat-symbols hearts">${adaptiveSymbols('♥', p.hp)}</span></div>`);
+  h.push(`<div class="stat-row"><span class="stat-label">能量</span><span class="stat-num">${p.energy}</span><span class="stat-symbols energy">${adaptiveSymbols('◆', p.energy)}</span></div>`);
+
+  if (p.passives && p.passives.includes('zoroKi')) {
+    h.push(`<div class="stat-row"><span class="stat-label">气</span><span class="stat-num">${p.ki}/4</span><span class="stat-symbols ki">${'◈'.repeat(p.ki)}${'·'.repeat(4-p.ki)}</span></div>`);
+  }
+  if (p.shield > 0) {
+    h.push(`<div class="stat-row"><span class="stat-label">盾</span><span class="stat-num">${formatHp(p.shield)}</span><span class="stat-symbols shield">${adaptiveSymbols('◇', p.shield)}</span></div>`);
+  }
+  if (p.passives && p.passives.includes('otakuCola')) {
+    h.push(`<div class="stat-row"><span class="stat-label">可乐</span><span class="stat-num">${formatHp(p.cola)}</span><span class="stat-symbols" style="color:#6fa98c;">${adaptiveSymbols('◉', p.cola)}</span></div>`);
+  }
+
+  const tags = [];
+  if (p.passives && p.passives.includes('mageMultiplier') && p.skillMultiplier > 1)
+    tags.push({ text: `倍率 x${p.skillMultiplier}`, buff: true });
+  if (p.passives && p.passives.includes('otakuOppression') && p.hp === p.cola && p.hp > 0)
+    tags.push({ text: '恰到好处就绪', buff: true });
+  if (p.throwCharges > 0) tags.push({ text: `投掷 ${p.throwCharges}束`, buff: true });
+  if (p.puppetTarget !== null) tags.push({ text: '操纵中', buff: true });
+  if (p.freeCharges) {
+    if (p.freeCharges.wand > 0) tags.push({ text: `法杖券x${p.freeCharges.wand}`, buff: true });
+    if (p.freeCharges.miehun > 0) tags.push({ text: `迷魂券x${p.freeCharges.miehun}`, buff: true });
+    if (p.freeCharges.shizi > 0) tags.push({ text: `封禁券x${p.freeCharges.shizi}`, buff: true });
+  }
+  if (p.stunTurns > 0) tags.push({ text: `眩晕 ${p.stunTurns}回合` });
+  else if (p.pendingStunTurns > 0) tags.push({ text: `眩晕待生效` });
+  if (p.rageTurns > 0) tags.push({ text: `激怒 ${p.rageTurns}回合` });
+  else if (p.pendingRageTurns > 0) tags.push({ text: `激怒待生效` });
+  if (p.poisonStacks > 0) tags.push({ text: `中毒 ${p.poisonStacks}层` });
+  if (p.lostDefenses && p.lostDefenses.length > 0)
+    p.lostDefenses.forEach(a => tags.push({ text: `失去${ACTIONS[a].name}` }));
+  if (p.bannedActions && p.bannedActions.length > 0)
+    p.bannedActions.forEach(a => tags.push({ text: `封禁${ACTIONS[a]?ACTIONS[a].name:a}` }));
+
+  if (tags.length) {
+    h.push(`<div class="debuff-tags">${tags.map(t =>
+      `<span class="${t.buff?'buff-tag':'debuff-tag'}">${escapeHtml(t.text)}</span>`
+    ).join('')}</div>`);
+  }
+
+  const charDef = CHARACTERS[p.characterId];
+  const passiveTip = charDef ? `<div class="passive-tip">${escapeHtml(charDef.desc)}</div>` : '';
+  return `<div class="player-card ${p.hp===0?'dead':''}">${h.join('')}${passiveTip}</div>`;
+}
+
+function renderPlaying() {
+  const statusHtml = state.players.map(statusCardHtml).join('');
+  const logHtml = state.log.slice(-22).map(l =>
+    `<p class="${l.type}">${escapeHtml(l.text)}</p>`
+  ).join('');
+
+  app.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+      <button class="btn" id="btn-quit" style="padding:6px 12px; font-size:13px;">返回主界面</button>
+      <h1 style="margin:0;">第 ${state.turn} 回合</h1>
+      <div style="width:100px;"></div>
+    </div>
+    <div class="players">${statusHtml}</div>
+    <div class="log" id="log">${logHtml}</div>
+    <div id="phase-area" class="phase-area"></div>
+  `;
+  document.getElementById('btn-quit').onclick = () => {
+    if (confirm('确定返回主界面？当前对局将丢失。')) {
+      state.screen = 'menu';
+      render();
+    }
+  };
+  document.getElementById('log').scrollTop = 999999;
+
+  const area = document.getElementById('phase-area');
+  if (state.phase === 'select0') renderSelectPhase(area, 0);
+  else if (state.phase === 'handoff') renderHandoff(area);
+  else if (state.phase === 'select1') renderSelectPhase(area, 1);
+  else if (state.phase === 'reveal') renderReveal(area);
+}
+
+function renderSelectPhase(container, playerId) {
+  const p = state.players[playerId];
+
+  if (p.stunTurns > 0) {
+    const stunPlaceholder = { playerId, action: 'recover', target: playerId, stunned: true };
+    if (state.mode === 'pve' && playerId === 1) {
+      state.choices.push(stunPlaceholder);
+      state.phase = 'reveal';
+      render();
+      return;
+    }
+    container.innerHTML = `
+      <div class="handoff-screen" style="background:#2d1a1a;">
+        <h2 style="color:#ff4757;">${escapeHtml(p.name)} 被眩晕</h2>
+        <p>本回合无法行动（剩余眩晕 ${p.stunTurns} 回合）</p>
+        <button class="btn primary" id="btn-skip">继续</button>
+      </div>
+    `;
+    document.getElementById('btn-skip').onclick = () => {
+      state.choices.push(stunPlaceholder);
+      if (playerId === 0) {
+        state.phase = state.mode === 'pvp' ? 'handoff' : 'select1';
+      } else {
+        state.phase = 'reveal';
+      }
+      render();
+    };
+    return;
+  }
+
+  if (state.mode === 'pve' && playerId === 1) {
+    state.choices.push(aiChoose(1));
+    state.phase = 'reveal';
+    render();
+    return;
+  }
+
+  const actions = playerAvailableActions(p);
+  const btns = actions.map(aid => {
+    const a = ACTIONS[aid];
+    const hasCharge = (p.freeCharges || {})[aid] > 0;
+    const disabled = !canPayAction(p, aid);
+    const isSkill = a.kind === 'skill';
+    const costBrief = hasCharge ? '免费' : (a.hpCost ? `${a.hpCost}HP` : '') + (a.cost ? `${a.cost}费` : '0费');
+    const tags = actionBriefTags(a);
+    const detail = actionDetailText(a);
+    return `<button class="btn action-btn ${isSkill?'skill':''}" data-act="${aid}" ${disabled?'disabled':''}>
+      ${a.name} <span class="cost-tag">${costBrief}</span>
+      ${tags ? `<div class="action-tags">${tags}</div>` : ''}
+      <div class="detail-tip">${escapeHtml(a.tip)}${detail ? `<div class="ctrl-hint">Ctrl 查看机制详情</div><div class="ext">${escapeHtml(detail)}</div>` : ''}</div>
+    </button>`;
+  }).join('');
+
+  // 木偶操纵：额外显示对方的技能列表
+  let puppetBtns = '';
+  if (p.puppetTarget !== null) {
+    const enemy = state.players[p.puppetTarget];
+    const enemySkills = playerAvailableActions(enemy).filter(id => ACTIONS[id].kind === 'skill');
+    if (enemySkills.length) {
+      puppetBtns = `<div style="margin-top:12px;border-top:1px solid #533483;padding-top:10px;">
+        <div style="color:#ff9770;font-size:13px;margin-bottom:8px;">操纵 ${escapeHtml(enemy.name)} 的技能（扣对方能量）</div>
+        <div class="actions">${enemySkills.map(aid => {
+          const a = ACTIONS[aid];
+          const disabled = enemy.energy < a.cost;
+          return `<button class="btn action-btn skill" style="border-color:#ff9770;" data-puppet="${aid}" ${disabled?'disabled':''}>
+            ${a.name}
+            <span class="tip">${a.tip} · ${a.cost}费（对方）</span>
+          </button>`;
+        }).join('')}</div>
+      </div>`;
+    }
+  }
+
+  const rageBanner = p.rageTurns > 0
+    ? `<div class="hint-box show" style="border-left-color:#ff4757;color:#ff9a9a;"><strong>激怒中！</strong>本回合必须使用【技能】（带红框的按钮），否则直接出局。</div>`
+    : '';
+
+  container.innerHTML = `
+    <div class="phase-title">${escapeHtml(p.name)} 请秘密选招</div>
+    ${rageBanner}
+    <div class="actions">${btns}</div>
+    ${puppetBtns}
+  `;
+  container.querySelectorAll('button[data-act]').forEach(btn => {
+    btn.onclick = () => chooseAction(playerId, btn.dataset.act);
+  });
+  container.querySelectorAll('button[data-puppet]').forEach(btn => {
+    btn.onclick = () => {
+      const actionId = btn.dataset.puppet;
+      const a = ACTIONS[actionId];
+      const target = a.category === 'attack' ? (1 - playerId) : playerId;
+      state.choices.push({ playerId, action: actionId, target, puppet: true, puppetSource: p.puppetTarget });
+      if (playerId === 0) { state.phase = state.mode === 'pvp' ? 'handoff' : 'select1'; }
+      else { state.phase = 'reveal'; }
+      render();
+    };
+  });
+}
+
+function chooseAction(playerId, actionId) {
+  const a = ACTIONS[actionId];
+  let target = playerId;
+  if (a.category === 'attack') target = 1 - playerId;
+  state.choices.push({ playerId, action: actionId, target });
+
+  if (playerId === 0) {
+    state.phase = state.mode === 'pvp' ? 'handoff' : 'select1';
+  } else {
+    state.phase = 'reveal';
+  }
+  render();
+}
+
+function renderHandoff(container) {
+  container.innerHTML = `
+    <div class="handoff-screen">
+      <h2>请把电脑交给 ${escapeHtml(state.players[1].name)}</h2>
+      <p>（${escapeHtml(state.players[0].name)} 已选好，请保密）</p>
+      <button class="btn primary" id="btn-continue">我准备好了，继续</button>
+    </div>
+  `;
+  document.getElementById('btn-continue').onclick = () => {
+    state.phase = 'select1';
+    render();
+  };
+}
+
+function renderReveal(container) {
+  const turnLog = resolveTurn(state.choices, state.players);
+  state.log.push(...turnLog);
+  state.turn += 1;
+
+  const c0 = state.choices[0], c1 = state.choices[1];
+  const a0 = ACTIONS[c0.action], a1 = ACTIONS[c1.action];
+  const label0 = c0.stunned ? '眩晕无法行动' : a0.name;
+  const label1 = c1.stunned ? '眩晕无法行动' : a1.name;
+
+  container.innerHTML = `
+    <div class="reveal">
+      <div class="reveal-item">
+        <div class="who">${escapeHtml(state.players[0].name)}</div>
+        <div class="what">${label0}</div>
+      </div>
+      <div style="font-size:22px; align-self:center; color:#e94560;">VS</div>
+      <div class="reveal-item">
+        <div class="who">${escapeHtml(state.players[1].name)}</div>
+        <div class="what">${label1}</div>
+      </div>
+    </div>
+    <div style="text-align:center;">
+      <button class="btn primary" id="btn-next">下一回合</button>
+    </div>
+  `;
+
+  state.choices = [];
+
+  document.querySelector('.players').innerHTML = state.players.map(statusCardHtml).join('');
+  const logEl = document.getElementById('log');
+  logEl.innerHTML = state.log.slice(-22).map(l =>
+    `<p class="${l.type}">${escapeHtml(l.text)}</p>`
+  ).join('');
+  logEl.scrollTop = 999999;
+
+  document.getElementById('btn-next').onclick = () => {
+    if (checkGameOver()) { render(); return; }
+    state.phase = 'select0';
+    render();
+  };
+}
+
+function renderGameOver() {
+  const msg = state.winner
+    ? `${escapeHtml(state.winner.name)} 获胜！`
+    : `平局！`;
+  app.innerHTML = `
+    <h1>对战结束</h1>
+    <div style="text-align:center; padding:40px 0;">
+      <h2 style="color:#e94560; font-size:28px;">${msg}</h2>
+      <p style="margin:20px 0; color:#aaa;">共进行 ${state.turn - 1} 回合</p>
+      <button class="btn primary" id="btn-rematch">再来一局</button>
+      <button class="btn" id="btn-menu">返回菜单</button>
+    </div>
+  `;
+  document.getElementById('btn-rematch').onclick = () => {
+    startGame(state.players[0].name, state.players[1].name, state.players[0].characterId, state.players[1].characterId);
+  };
+  document.getElementById('btn-menu').onclick = () => {
+    state.screen = 'menu';
+    render();
+  };
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, ch => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[ch]));
+}
+
+render();
+</script>
+</body>
+</html>
