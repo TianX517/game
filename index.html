@@ -2,6 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>对战游戏</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -301,6 +302,26 @@
   .tag.new { background: #2d6a4f; color: #b7efc5; }
   .tag.adjust { background: #6a4c2d; color: #ffd89b; }
   .tag.fix { background: #4c2d6a; color: #d9b7ef; }
+
+  /* 手机适配 */
+  @media (max-width: 600px) {
+    body { padding: 8px; align-items: flex-start; }
+    #app { padding: 14px; }
+    h1 { font-size: 22px; margin-bottom: 12px; }
+    .players { flex-direction: column; gap: 10px; }
+    .player-card { padding: 10px 12px; }
+    .action-btn { min-width: 88px; padding: 10px 6px; font-size: 14px; }
+    .action-btn .cost-tag { font-size: 10px; }
+    .atag { font-size: 9px; padding: 1px 4px; }
+    .char-grid { gap: 6px; }
+    .char-card { min-width: 80px; padding: 6px 10px; }
+    .char-card h3 { font-size: 13px; }
+    .changelog { max-height: 300px; }
+    /* 手机点按显示 tooltip */
+    .action-btn:active .detail-tip { display: block; }
+    .player-card:active .passive-tip { display: block; }
+    .detail-tip { max-width: 90vw; }
+  }
 </style>
 </head>
 <body>
