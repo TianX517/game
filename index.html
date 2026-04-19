@@ -63,6 +63,7 @@
     border-radius: 10px;
     border: 2px solid #1a3a6a;
     box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+    min-height: 170px;
   }
   .player-card.active { border-color: #f5a623; box-shadow: 0 0 12px rgba(245,166,35,0.2); }
   .player-card.dead { opacity: 0.35; filter: grayscale(60%); }
@@ -95,8 +96,7 @@
     background: #0d1b2a;
     padding: 12px;
     border-radius: 6px;
-    min-height: 120px;
-    max-height: 220px;
+    height: 200px;
     overflow-y: auto;
     font-size: 14px;
     line-height: 1.7;
@@ -112,7 +112,7 @@
   .log .ki { color: #c59ae0; }
   .log .destroy { color: #ff9770; }
 
-  .phase-area { text-align: center; padding: 12px 0; }
+  .phase-area { text-align: center; padding: 12px 0; min-height: 260px; display: flex; flex-direction: column; justify-content: center; }
   .phase-title { font-size: 20px; margin-bottom: 12px; color: #f5a623; }
   .actions { display: flex; flex-wrap: wrap; justify-content: center; }
   .action-btn {
@@ -309,7 +309,9 @@
     #app { padding: 14px; }
     h1 { font-size: 22px; margin-bottom: 12px; }
     .players { flex-direction: column; gap: 10px; }
-    .player-card { padding: 10px 12px; }
+    .player-card { padding: 10px 12px; min-height: 100px; }
+    .phase-area { min-height: 200px; }
+    .log { height: 160px; }
     .action-btn { min-width: 88px; padding: 10px 6px; font-size: 14px; }
     .action-btn .cost-tag { font-size: 10px; }
     .atag { font-size: 9px; padding: 1px 4px; }
