@@ -1,5 +1,14 @@
 CHANGELOG.push(
   {
+    version: 'v1.6',
+    date: '2026-04-20',
+    entries: [
+      { type: '新增', text: '对战设置新增 AI 风格选择：轻量（快、随机、攻击性强）/ 智能（minimax 推演 2 回合）。默认轻量。' },
+      { type: '调整', text: '刺客 AI：提高使用遁入暗影的优先级（解锁技能奖励大幅提升）。' },
+      { type: '调整', text: '阿宅 AI：降低风险厌恶，提高霰弹枪/醉酒的优先级。' },
+    ],
+  },
+  {
     version: 'v1.5',
     date: '2026-04-19',
     entries: [

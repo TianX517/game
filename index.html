@@ -520,7 +520,8 @@ const state = {
   log: [],
   turn: 1,
   winner: null,
-  setup: { p1Char: 'default', p2Char: 'default' },
+  setup: { p1Char: 'default', p2Char: 'default', aiMode: 'heuristic' },
+  aiMode: 'heuristic',  // 当前对局用的 AI 风格
 };
 
 // ============================================================
@@ -1149,12 +1150,29 @@ function renderSetup() {
       <div class="char-grid">${charCards('p2')}</div>
       ${descBox('p2')}
 
+      ${state.mode === 'pve' ? `
+      <h2 style="margin-top:16px;">AI 风格</h2>
+      <div style="display:flex; gap:10px;">
+        <label style="flex:1; background:#0f3460; padding:10px 12px; border-radius:8px; border:2px solid ${(state.setup.aiMode||'heuristic')==='heuristic'?'#e94560':'#533483'}; cursor:pointer;">
+          <input type="radio" name="ai-mode" value="heuristic" ${(state.setup.aiMode||'heuristic')==='heuristic'?'checked':''} style="margin-right:6px;">
+          <b>轻量</b><br><span style="color:#aaa;font-size:12px;">秒出招，更随机，攻击倾向高</span>
+        </label>
+        <label style="flex:1; background:#0f3460; padding:10px 12px; border-radius:8px; border:2px solid ${state.setup.aiMode==='smart'?'#e94560':'#533483'}; cursor:pointer;">
+          <input type="radio" name="ai-mode" value="smart" ${state.setup.aiMode==='smart'?'checked':''} style="margin-right:6px;">
+          <b>智能</b><br><span style="color:#aaa;font-size:12px;">1-2 秒思考，minimax 前瞻 2 回合</span>
+        </label>
+      </div>
+      ` : ''}
+
       <div style="margin-top:20px; text-align:center;">
         <button class="btn" id="btn-back">返回</button>
         <button class="btn primary" id="btn-start">开始对战</button>
       </div>
     </div>
   `;
+  document.querySelectorAll('input[name="ai-mode"]').forEach(el => {
+    el.onchange = () => { state.setup.aiMode = el.value; renderSetup(); };
+  });
   document.querySelectorAll('.char-card').forEach(el => {
     el.onclick = () => {
       const side = el.dataset.side;
@@ -1178,6 +1196,7 @@ function startGame(n1, n2, c1, c2) {
   state.phase = 'select0';
   state.screen = 'playing';
   state.winner = null;
+  state.aiMode = state.setup.aiMode || 'heuristic';
   render();
 }
 
@@ -1294,12 +1313,19 @@ function renderSelectPhase(container, playerId) {
   }
 
   if (state.mode === 'pve' && playerId === 1) {
-    container.innerHTML = `<div class="phase-title" style="color:#9d65c9;">AI 思考中...</div><div style="text-align:center;color:#888;font-size:12px;">正在推演后续 2 回合</div>`;
-    setTimeout(() => {
-      state.choices.push(aiChoose(1));
+    const aiFn = state.aiMode === 'smart' ? aiChoose : aiHeuristic;
+    if (state.aiMode === 'smart') {
+      container.innerHTML = `<div class="phase-title" style="color:#9d65c9;">AI 思考中...</div><div style="text-align:center;color:#888;font-size:12px;">正在推演后续 2 回合</div>`;
+      setTimeout(() => {
+        state.choices.push(aiFn(1));
+        state.phase = 'reveal';
+        render();
+      }, 30);
+    } else {
+      state.choices.push(aiFn(1));
       state.phase = 'reveal';
       render();
-    }, 30);
+    }
     return;
   }
 
